@@ -6,7 +6,7 @@ INSTALL_DIR ?= /usr/local/bin
 
 .PHONY: all build install test clean clean-data run
 
-VERSION ?= v0.1.0
+VERSION ?= v0.1.1
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS = -ldflags "-X consolehub/internal/version.Version=$(VERSION) -X consolehub/internal/version.GitCommit=$(GIT_COMMIT) -X consolehub/internal/version.BuildDate=$(BUILD_DATE)"

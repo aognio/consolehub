@@ -202,9 +202,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		activeTenantID := h.getActiveTenantID(r)
 		apiKeys, _ := h.services.ListAPIKeys(r.Context(), activeTenantID)
 		tenants, _ := h.services.ListTenants(r.Context())
+
+		type APIKeyWithTenant struct {
+			*models.APIKey
+			Tenant *models.Tenant
+		}
+
+		apiKeyVMs := make([]APIKeyWithTenant, 0, len(apiKeys))
+		for _, k := range apiKeys {
+			tObj, _ := h.services.GetTenantByID(r.Context(), k.TenantID)
+			apiKeyVMs = append(apiKeyVMs, APIKeyWithTenant{
+				APIKey: k,
+				Tenant: tObj,
+			})
+		}
+
 		_ = h.tmpl.Render(w, "api_keys.html", h.preparePageData(r, "API Keys", map[string]any{
-			"APIKeys": apiKeys,
-			"Tenants": tenants,
+			"APIKeys":        apiKeyVMs,
+			"Tenants":        tenants,
+			"ActiveTenantID": activeTenantID,
 		}))
 
 	case "/settings":
@@ -483,6 +499,12 @@ func (h *Handler) handleAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		tenantID := r.FormValue("tenant_id")
 		if tenantID == "" {
 			tenantID = h.getActiveTenantID(r)
+		}
+		if tenantID == "" {
+			tenants, _ := h.services.ListTenants(r.Context())
+			if len(tenants) > 0 {
+				tenantID = tenants[0].ID
+			}
 		}
 		title := r.FormValue("title")
 		desc := r.FormValue("description")

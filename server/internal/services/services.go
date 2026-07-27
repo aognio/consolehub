@@ -182,6 +182,10 @@ func (s *Services) GetHostByID(ctx context.Context, id string) (*models.Host, er
 	return s.store.GetHostByID(id)
 }
 
+func (s *Services) GetHostBySlug(ctx context.Context, slug string) (*models.Host, error) {
+	return s.store.GetHostBySlug(slug)
+}
+
 func (s *Services) ListHosts(ctx context.Context) ([]*models.Host, error) {
 	hosts, err := s.store.ListHosts()
 	if err != nil {

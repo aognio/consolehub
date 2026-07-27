@@ -23,6 +23,7 @@ const (
 	ErrCodeInvalidParams   = -32602
 	ErrCodeInternalError   = -32603
 	ErrCodeAuthRequired    = -32001
+	ErrCodeUnauthorized    = -32002
 	ErrCodeTenantNotFound  = -32003
 	ErrCodeProcessNotFound = -32004
 )
@@ -180,23 +181,82 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 			}
 		}
 
-		tenant, err := h.services.GetTenantBySlug(ctx, params.Tenant)
-		if err != nil {
+		var tenant *models.Tenant
+		var err error
+
+		if params.Tenant != "" {
+			tenant, err = h.services.GetTenantBySlug(ctx, params.Tenant)
+			if err != nil {
+				return &Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Tenant not found"},
+				}
+			}
+		} else if session.tenantID != "" {
+			tenant, err = h.services.GetTenantByID(ctx, session.tenantID)
+			if err != nil {
+				return &Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Authenticated tenant not found"},
+				}
+			}
+		} else {
 			return &Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
-				Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Tenant not found"},
+				Error:   &Error{Code: ErrCodeInvalidParams, Message: "Tenant parameter is required"},
 			}
 		}
 
-		slug := params.Host.Slug
-		if slug == "" {
-			slug = params.Host.Hostname
+		// Enforce tenant scoping: API key must belong to the tenant to which the application belongs
+		if session.tenantID != "" && session.tenantID != tenant.ID {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeUnauthorized, Message: "API key does not belong to the requested tenant"},
+			}
 		}
-		host, _ := h.services.RegisterHost(ctx, slug, params.Host.Hostname, params.Host.FQDN, params.Host.DisplayName, params.Host.Platform)
-		if host != nil {
-			_ = h.services.AssociateHostTenant(ctx, host.ID, tenant.ID)
+
+		hostSlug := params.Host.Slug
+		if hostSlug == "" {
+			hostSlug = params.Host.Hostname
 		}
+
+		existingHost, err := h.services.GetHostBySlug(ctx, hostSlug)
+		if err != nil && params.Host.Hostname != "" && hostSlug != params.Host.Hostname {
+			existingHost, err = h.services.GetHostBySlug(ctx, params.Host.Hostname)
+		}
+
+		if err != nil || existingHost == nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInvalidParams, Message: fmt.Sprintf("Host '%s' not found. The hostname sent must match the slug of an existing host associated to tenant '%s'", hostSlug, tenant.Slug)},
+			}
+		}
+
+		associatedTenants, err := h.services.ListTenantsByHost(ctx, existingHost.ID)
+		isAssociated := false
+		if err == nil {
+			for _, t := range associatedTenants {
+				if t.ID == tenant.ID {
+					isAssociated = true
+					break
+				}
+			}
+		}
+
+		if !isAssociated {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeUnauthorized, Message: fmt.Sprintf("Host '%s' is not associated to tenant '%s'", existingHost.Slug, tenant.Slug)},
+			}
+		}
+
+		host, _ := h.services.RegisterHost(ctx, existingHost.Slug, params.Host.Hostname, params.Host.FQDN, params.Host.DisplayName, params.Host.Platform)
 		app, _ := h.services.CreateApp(ctx, tenant.ID, params.App, params.App, "")
 
 		startedAt, _ := time.Parse(time.RFC3339, params.Process.StartedAt)
