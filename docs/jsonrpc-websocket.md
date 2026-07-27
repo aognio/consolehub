@@ -104,6 +104,93 @@ If HTTP header authentication is omitted, the first message sent over the WebSoc
 
 ## 4. Procedure Reference
 
+### `healthz` (Unauthenticated)
+Returns server status, version, and timestamp. Does not require authentication or API keys.
+
+#### Request
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "healthz"
+}
+```
+
+#### Response
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "status": "ok",
+    "version": "v0.1.1",
+    "timestamp": "2026-07-27T01:43:49Z"
+  }
+}
+```
+
+### `tenant.info` (Authenticated)
+Retrieves full details for the authenticated tenant.
+
+#### Request
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tenant.info"
+}
+```
+
+#### Response
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "id": "tenant_xyz",
+    "name": "Acme Corp",
+    "slug": "acme-corp",
+    "active": true,
+    "created_at": "2026-07-27T00:00:00Z",
+    "updated_at": "2026-07-27T00:00:00Z"
+  }
+}
+```
+
+### `tenant.app_list` (Authenticated)
+Retrieves all applications belonging to the authenticated tenant.
+
+#### Request
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tenant.app_list"
+}
+```
+
+#### Response
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "tenant_id": "tenant_xyz",
+    "apps": [
+      {
+        "id": "app_01",
+        "tenant_id": "tenant_xyz",
+        "name": "sync-service",
+        "display_name": "Sync Service",
+        "description": "Main sync daemon",
+        "created_at": "2026-07-27T00:00:00Z",
+        "updated_at": "2026-07-27T00:00:00Z"
+      }
+    ]
+  }
+}
+```
+
 ### `process.register`
 Registers an application execution. Utilizes `process.client_run_id` for client-side idempotency.
 

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2026-07-27
+
+### Added
+- **Unauthenticated `healthz` JSON-RPC Procedure**:
+  - Added an unauthenticated `healthz` (and `system.healthz`) JSON-RPC 2.0 procedure returning server status (`"ok"`), server version (`"v0.1.2"`), and timestamp.
+- **Tenant Management JSON-RPC Procedures**:
+  - Added authenticated `tenant.info` procedure returning full metadata for the authenticated tenant.
+  - Added authenticated `tenant.app_list` procedure returning all applications associated with the tenant.
+- **Go Client Library Protocol Extensions**:
+  - Added `MethodHealthz`, `MethodTenantInfo`, `MethodTenantAppList` constants and `HealthzResult`, `TenantInfoResult`, `TenantAppListResult` structs to `libraries/go/consolehub/protocol/protocol.go`.
+- **Documentation & Agent Skill Updates**:
+  - Updated `docs/jsonrpc-websocket.md` and `skills/consolehub/SKILL.md` with procedure references and payload schemas.
+
+---
+
 ## [0.1.1] - 2026-07-27
 
 ### Added

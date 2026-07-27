@@ -12,6 +12,7 @@ import (
 	"consolehub/internal/models"
 	"consolehub/internal/services"
 	"consolehub/internal/stream"
+	"consolehub/internal/version"
 
 	"github.com/gorilla/websocket"
 )
@@ -118,6 +119,18 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 		}
 	}
 
+	if req.Method == "healthz" || req.Method == "system.healthz" {
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]any{
+				"status":    "ok",
+				"version":   version.Version,
+				"timestamp": time.Now().Format(time.RFC3339),
+			},
+		}
+	}
+
 	if req.Method == "auth.authenticate" {
 		var params struct {
 			Token string `json:"token"`
@@ -152,6 +165,108 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 	}
 
 	switch req.Method {
+	case "tenant.info":
+		tenantID := session.tenantID
+		var params struct {
+			Tenant string `json:"tenant"`
+		}
+		if len(req.Params) > 0 {
+			_ = json.Unmarshal(req.Params, &params)
+		}
+
+		var tenant *models.Tenant
+		var err error
+		if params.Tenant != "" {
+			tenant, err = h.services.GetTenantBySlug(ctx, params.Tenant)
+		} else if tenantID != "" {
+			tenant, err = h.services.GetTenantByID(ctx, tenantID)
+		} else {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInvalidParams, Message: "Tenant parameter is required"},
+			}
+		}
+
+		if err != nil || tenant == nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Tenant not found"},
+			}
+		}
+
+		if session.tenantID != "" && session.tenantID != tenant.ID {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeUnauthorized, Message: "API key does not belong to the requested tenant"},
+			}
+		}
+
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  tenant,
+		}
+
+	case "tenant.app_list":
+		tenantID := session.tenantID
+		var params struct {
+			Tenant string `json:"tenant"`
+		}
+		if len(req.Params) > 0 {
+			_ = json.Unmarshal(req.Params, &params)
+		}
+
+		var tenant *models.Tenant
+		var err error
+		if params.Tenant != "" {
+			tenant, err = h.services.GetTenantBySlug(ctx, params.Tenant)
+		} else if tenantID != "" {
+			tenant, err = h.services.GetTenantByID(ctx, tenantID)
+		} else {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInvalidParams, Message: "Tenant parameter is required"},
+			}
+		}
+
+		if err != nil || tenant == nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Tenant not found"},
+			}
+		}
+
+		if session.tenantID != "" && session.tenantID != tenant.ID {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeUnauthorized, Message: "API key does not belong to the requested tenant"},
+			}
+		}
+
+		apps, err := h.services.ListAppsByTenant(ctx, tenant.ID)
+		if err != nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInternalError, Message: err.Error()},
+			}
+		}
+
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]any{
+				"tenant_id": tenant.ID,
+				"apps":      apps,
+			},
+		}
+
 	case "process.register":
 		var params struct {
 			Tenant  string `json:"tenant"`

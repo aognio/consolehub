@@ -2,7 +2,10 @@ package protocol
 
 // Method constants
 const (
+	MethodHealthz          = "healthz"
 	MethodAuthAuthenticate = "auth.authenticate"
+	MethodTenantInfo       = "tenant.info"
+	MethodTenantAppList    = "tenant.app_list"
 	MethodProcessRegister  = "process.register"
 	MethodStreamAppend     = "stream.append"
 	MethodProcessHeartbeat = "process.heartbeat"
@@ -52,6 +55,13 @@ type ResponseError struct {
 	Data    any    `json:"data,omitempty"`
 }
 
+// HealthzResult represents healthz response payload.
+type HealthzResult struct {
+	Status    string `json:"status"`
+	Version   string `json:"version"`
+	Timestamp string `json:"timestamp"`
+}
+
 // AuthParams represents auth.authenticate request parameters.
 type AuthParams struct {
 	Token    string            `json:"token"`
@@ -63,6 +73,43 @@ type AuthResult struct {
 	Authenticated bool   `json:"authenticated"`
 	TenantID      string `json:"tenant_id,omitempty"`
 	TenantSlug    string `json:"tenant_slug,omitempty"`
+}
+
+// TenantInfoParams represents tenant.info request parameters.
+type TenantInfoParams struct {
+	Tenant string `json:"tenant,omitempty"`
+}
+
+// TenantInfoResult represents tenant.info response payload.
+type TenantInfoResult struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	Active    bool   `json:"active"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// TenantAppListParams represents tenant.app_list request parameters.
+type TenantAppListParams struct {
+	Tenant string `json:"tenant,omitempty"`
+}
+
+// AppDetails represents application details in tenant.app_list response.
+type AppDetails struct {
+	ID          string `json:"id"`
+	TenantID    string `json:"tenant_id"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+// TenantAppListResult represents tenant.app_list response payload.
+type TenantAppListResult struct {
+	TenantID string       `json:"tenant_id"`
+	Apps     []AppDetails `json:"apps"`
 }
 
 // ProcessRegisterParams represents process.register request parameters.

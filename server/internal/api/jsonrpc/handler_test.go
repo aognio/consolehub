@@ -242,3 +242,104 @@ func TestJSONRPC_HostSlugNotAssociated(t *testing.T) {
 		t.Fatalf("expected ErrCodeInvalidParams (%d), got %v", jsonrpc.ErrCodeInvalidParams, errObj["code"])
 	}
 }
+
+func TestJSONRPC_HealthzUnauthenticated(t *testing.T) {
+	server, _ := setupTestJSONRPCHandler(t)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to dial websocket: %v", err)
+	}
+	defer ws.Close()
+
+	// Call healthz procedure without prior authentication
+	healthReq := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "healthz",
+	}
+	if err := ws.WriteJSON(healthReq); err != nil {
+		t.Fatalf("failed to write healthz req: %v", err)
+	}
+
+	var resp map[string]any
+	if err := ws.ReadJSON(&resp); err != nil {
+		t.Fatalf("failed to read healthz resp: %v", err)
+	}
+
+	result, ok := resp["result"].(map[string]any)
+	if !ok || result["status"] != "ok" {
+		t.Fatalf("expected status ok in healthz response, got %v", resp)
+	}
+}
+
+func TestJSONRPC_TenantInfoAndAppList(t *testing.T) {
+	server, svc := setupTestJSONRPCHandler(t)
+	defer server.Close()
+
+	ctx := context.Background()
+	tenant, err := svc.CreateTenant(ctx, "Acme Corp", "acme-corp")
+	if err != nil {
+		t.Fatalf("failed to create tenant: %v", err)
+	}
+
+	_, _ = svc.CreateApp(ctx, tenant.ID, "sync-service", "Sync Service", "Main sync daemon")
+
+	_, rawKey, err := svc.CreateAPIKey(ctx, tenant.ID, "Acme Key", "Acme API Key", nil)
+	if err != nil {
+		t.Fatalf("failed to create API Key: %v", err)
+	}
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to dial websocket: %v", err)
+	}
+	defer ws.Close()
+
+	// 1. Authenticate
+	_ = ws.WriteJSON(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "auth.authenticate",
+		"params":  map[string]any{"token": rawKey},
+	})
+	var authResp map[string]any
+	_ = ws.ReadJSON(&authResp)
+
+	// 2. Test tenant.info
+	_ = ws.WriteJSON(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tenant.info",
+	})
+	var infoResp map[string]any
+	if err := ws.ReadJSON(&infoResp); err != nil {
+		t.Fatalf("failed to read tenant.info resp: %v", err)
+	}
+	infoRes, ok := infoResp["result"].(map[string]any)
+	if !ok || infoRes["slug"] != "acme-corp" {
+		t.Fatalf("expected slug acme-corp in tenant.info, got %v", infoResp)
+	}
+
+	// 3. Test tenant.app_list
+	_ = ws.WriteJSON(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tenant.app_list",
+	})
+	var listResp map[string]any
+	if err := ws.ReadJSON(&listResp); err != nil {
+		t.Fatalf("failed to read tenant.app_list resp: %v", err)
+	}
+	listRes, ok := listResp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected result map in tenant.app_list, got %v", listResp)
+	}
+	appsList, ok := listRes["apps"].([]any)
+	if !ok || len(appsList) == 0 {
+		t.Fatalf("expected at least 1 app in tenant.app_list result, got %v", listResp)
+	}
+}

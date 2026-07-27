@@ -314,6 +314,29 @@ func (s *Services) ListApps(ctx context.Context) ([]*models.App, error) {
 	return apps, nil
 }
 
+func (s *Services) ListAppsByTenant(ctx context.Context, tenantID string) ([]*models.App, error) {
+	if tenantID == "" {
+		return s.ListApps(ctx)
+	}
+	recs, err := s.store.App.FindRecordsByFilter("ch_apps", "tenant_id = {:tenant_id}", "+name", 500, 0, dbx.Params{"tenant_id": tenantID})
+	if err != nil {
+		return nil, err
+	}
+	apps := make([]*models.App, 0, len(recs))
+	for _, r := range recs {
+		apps = append(apps, &models.App{
+			ID:          r.Id,
+			TenantID:    r.GetString("tenant_id"),
+			Name:        r.GetString("name"),
+			DisplayName: r.GetString("display_name"),
+			Description: r.GetString("description"),
+			CreatedAt:   r.GetDateTime("created").Time(),
+			UpdatedAt:   r.GetDateTime("updated").Time(),
+		})
+	}
+	return apps, nil
+}
+
 func (s *Services) UpdateApp(ctx context.Context, id, name, displayName, description string) (*models.App, error) {
 	rec, err := s.store.App.FindRecordById("ch_apps", id)
 	if err != nil {
