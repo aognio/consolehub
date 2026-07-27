@@ -1,0 +1,20 @@
+[Unit]
+Description=ConsoleHub Centralized Remote Console Server
+Documentation=https://github.com/consolehub/consolehub
+After=network.target
+
+[Service]
+Type=simple
+User=consolehub
+Group=consolehub
+ExecStart=/usr/local/bin/consolehub-server --config /etc/consolehub/server-config.toml
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

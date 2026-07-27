@@ -1,0 +1,18 @@
+# Binaries & build outputs
+bin/
+/consolehub
+consolehub.exe
+
+# PocketBase data directory
+pb_data/
+
+# Logs & temp files
+*.log
+*.tmp
+*.out
+coverage.out
+
+# IDE & OS metadata
+.DS_Store
+.idea/
+.vscode/

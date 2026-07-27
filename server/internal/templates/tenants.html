@@ -1,0 +1,112 @@
+{{define "content"}}
+<div class="space-y-6" x-data="{ showCreateTenantModal: false, showEditModal: false, editTenantID: '', editName: '', editSlug: '', editActive: 'true' }">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Tenants Administration</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Manage isolated multi-tenant organization boundaries</p>
+    </div>
+    <button @click="showCreateTenantModal = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition shadow">
+      + Create Tenant
+    </button>
+  </div>
+
+  <!-- Tenants Table -->
+  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-gray-500 uppercase text-xs">
+        <tr>
+          <th class="px-6 py-3.5">Name</th>
+          <th class="px-6 py-3.5">Slug</th>
+          <th class="px-6 py-3.5">Status</th>
+          <th class="px-6 py-3.5">Created</th>
+          <th class="px-6 py-3.5 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        {{range .Tenants}}
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+          <td class="px-6 py-4 font-semibold">{{.Name}}</td>
+          <td class="px-6 py-4 font-mono text-gray-500">{{.Slug}}</td>
+          <td class="px-6 py-4">
+            {{if .Active}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">Active</span>
+            {{else}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300">Disabled</span>
+            {{end}}
+          </td>
+          <td class="px-6 py-4 text-gray-500">{{formatTime .CreatedAt}}</td>
+          <td class="px-6 py-4 text-right space-x-2">
+            <button @click="editTenantID = '{{.ID}}'; editName = '{{.Name}}'; editSlug = '{{.Slug}}'; editActive = '{{.Active}}'; showEditModal = true" class="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition">
+              Edit
+            </button>
+            <form action="/tenants" method="POST" class="inline">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="tenant_id" value="{{.ID}}">
+              <button type="submit" class="px-2.5 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 rounded transition">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="5" class="px-6 py-8 text-center text-gray-500">No tenants configured yet.</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Edit Tenant Modal -->
+  <div x-show="showEditModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Edit Tenant Organization</h3>
+      <form action="/tenants" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="tenant_id" :value="editTenantID">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Tenant Name</label>
+          <input type="text" name="name" :value="editName" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Tenant Slug</label>
+          <input type="text" name="slug" :value="editSlug" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Status</label>
+          <select name="active" :value="editActive" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="true">Active</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showEditModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Tenant Modal -->
+  <div x-show="showCreateTenantModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Create New Organization Tenant</h3>
+      <form action="/tenants" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="create">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Tenant Name</label>
+          <input type="text" name="name" required placeholder="Acme Engineering" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Tenant Slug</label>
+          <input type="text" name="slug" required placeholder="acme-eng" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showCreateTenantModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Create Tenant</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

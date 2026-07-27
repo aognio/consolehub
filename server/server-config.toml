@@ -1,0 +1,17 @@
+# ConsoleHub Server Configuration File
+
+[server]
+host = "0.0.0.0"
+port = 3787
+scheme = "https"
+base_path = "/"
+public_url = "https://consolehub.example.com:3787"
+timezone = "Local"
+
+[security]
+cookie_secret = "consolehub-secret-key-production-32bytes!!"
+secure_cookies = false
+session_duration = "86400s"
+
+[pocketbase]
+data_dir = "./pb_data"

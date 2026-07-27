@@ -1,0 +1,186 @@
+{{define "content"}}
+<div class="space-y-6" x-data="{ showCreateModal: false, showEditModal: false, showAssignModal: false, editHostID: '', editSlug: '', editHostname: '', editFQDN: '', editDisplayName: '', editPlatform: '', editOnline: 'true', assignHostID: '', assignHostName: '' }">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Registered Hosts</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Remote machine nodes running telemetry host agents</p>
+    </div>
+    <button @click="showCreateModal = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition shadow">
+      + Register Host
+    </button>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-gray-500 uppercase text-xs">
+        <tr>
+          <th class="px-6 py-3.5">Slug</th>
+          <th class="px-6 py-3.5">Hostname / FQDN</th>
+          <th class="px-6 py-3.5">Display Name</th>
+          <th class="px-6 py-3.5">Platform</th>
+          <th class="px-6 py-3.5">Status</th>
+          <th class="px-6 py-3.5">Last Seen</th>
+          <th class="px-6 py-3.5 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        {{range .Hosts}}
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+          <td class="px-6 py-4 font-mono font-semibold text-xs">
+            <span class="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
+              {{.Slug}}
+            </span>
+          </td>
+          <td class="px-6 py-4 font-mono">
+            <div class="font-bold text-gray-900 dark:text-gray-100">{{.Hostname}}</div>
+            {{if .FQDN}}
+            <div class="text-xs text-gray-500 font-mono">{{.FQDN}}</div>
+            {{end}}
+          </td>
+          <td class="px-6 py-4">{{if .DisplayName}}{{.DisplayName}}{{else}}<span class="text-gray-400 font-italic">None</span>{{end}}</td>
+          <td class="px-6 py-4 text-gray-500 capitalize">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              {{.Platform}}
+            </span>
+          </td>
+          <td class="px-6 py-4">
+            {{if .Online}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">Online</span>
+            {{else}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">Offline</span>
+            {{end}}
+          </td>
+          <td class="px-6 py-4 text-gray-500">{{formatTime .LastSeen}}</td>
+          <td class="px-6 py-4 text-right space-x-2">
+            <button @click="assignHostID = '{{.ID}}'; assignHostName = '{{.Hostname}}'; showAssignModal = true" class="px-2.5 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded transition">
+              + Assign Tenant
+            </button>
+            <button @click="editHostID = '{{.ID}}'; editSlug = '{{.Slug}}'; editHostname = '{{.Hostname}}'; editFQDN = '{{.FQDN}}'; editDisplayName = '{{.DisplayName}}'; editPlatform = '{{.Platform}}'; editOnline = '{{.Online}}'; showEditModal = true" class="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition">
+              Edit
+            </button>
+            <form action="/hosts" method="POST" class="inline">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="host_id" value="{{.ID}}">
+              <button type="submit" class="px-2.5 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 rounded transition">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="7" class="px-6 py-8 text-center text-gray-500">No registered hosts found.</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Edit Host Modal -->
+  <div x-show="showEditModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Edit Host Machine</h3>
+      <form action="/hosts" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="host_id" :value="editHostID">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Host Slug (Unique)</label>
+          <input type="text" name="slug" :value="editSlug" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Hostname</label>
+          <input type="text" name="hostname" :value="editHostname" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">FQDN</label>
+          <input type="text" name="fqdn" :value="editFQDN" placeholder="vps-01.example.com" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Display Name</label>
+          <input type="text" name="display_name" :value="editDisplayName" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Platform</label>
+          <select name="platform" :value="editPlatform" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="linux">Linux</option>
+            <option value="darwin">macOS</option>
+            <option value="windows">Windows</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Status</label>
+          <select name="online" :value="editOnline" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="true">Online</option>
+            <option value="false">Offline</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showEditModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Assign Tenant Modal -->
+  <div x-show="showAssignModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Associate Tenant to <span x-text="assignHostName"></span></h3>
+      <form action="/hosts" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="associate_tenant">
+        <input type="hidden" name="host_id" :value="assignHostID">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Select Tenant</label>
+          <select name="tenant_id" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            {{range .Tenants}}
+            <option value="{{.ID}}">{{.Name}} ({{.Slug}})</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showAssignModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Associate Tenant</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Register Host Modal -->
+  <div x-show="showCreateModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Register Host Machine</h3>
+      <form action="/hosts" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="create">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Host Slug (Unique Identifier)</label>
+          <input type="text" name="slug" required placeholder="vps-01-prod" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Hostname</label>
+          <input type="text" name="hostname" required placeholder="vps-01" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">FQDN (Fully Qualified Domain Name)</label>
+          <input type="text" name="fqdn" placeholder="vps-01.example.com" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Display Name</label>
+          <input type="text" name="display_name" placeholder="Main Production VPS" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Platform</label>
+          <select name="platform" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="linux">Linux</option>
+            <option value="darwin">macOS</option>
+            <option value="windows">Windows</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showCreateModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Register Host</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

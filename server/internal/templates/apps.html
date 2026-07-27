@@ -1,0 +1,101 @@
+{{define "content"}}
+<div class="space-y-6" x-data="{ showCreateModal: false, showEditModal: false, editAppID: '', editName: '', editDisplayName: '', editDescription: '' }">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Application Directory</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Applications registered across host executions</p>
+    </div>
+    <button @click="showCreateModal = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition shadow">
+      + Register App
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {{range .Apps}}
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3 relative group">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-lg text-blue-600 dark:text-blue-400">{{.DisplayName}}</h3>
+        <div class="space-x-2">
+          <button @click="editAppID = '{{.ID}}'; editName = '{{.Name}}'; editDisplayName = '{{.DisplayName}}'; editDescription = '{{.Description}}'; showEditModal = true" class="text-xs font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white">Edit</button>
+          <form action="/apps" method="POST" class="inline">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="app_id" value="{{.ID}}">
+            <button type="submit" class="text-xs font-medium text-rose-500 hover:underline">Delete</button>
+          </form>
+        </div>
+      </div>
+      <p class="font-mono text-xs text-gray-500">{{.Name}}</p>
+      <p class="text-sm text-gray-600 dark:text-gray-400">{{.Description}}</p>
+      <div class="pt-2 text-[11px] text-gray-400 border-t border-gray-100 dark:border-gray-700/50">
+        Created: {{formatTime .CreatedAt}}
+      </div>
+    </div>
+    {{else}}
+    <div class="col-span-3 bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 text-center text-gray-500">
+      No applications registered yet.
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Edit App Modal -->
+  <div x-show="showEditModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Edit Application</h3>
+      <form action="/apps" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="app_id" :value="editAppID">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">App Identifier Name</label>
+          <input type="text" name="name" :value="editName" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Display Name</label>
+          <input type="text" name="display_name" :value="editDisplayName" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Description</label>
+          <textarea name="description" :value="editDescription" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none"></textarea>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showEditModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Register App Modal -->
+  <div x-show="showCreateModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Register Application</h3>
+      <form action="/apps" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="create">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Select Tenant</label>
+          <select name="tenant_id" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            {{range .Tenants}}
+            <option value="{{.ID}}">{{.Name}} ({{.Slug}})</option>
+            {{end}}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">App Identifier Name</label>
+          <input type="text" name="name" required placeholder="replicator" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Display Name</label>
+          <input type="text" name="display_name" placeholder="Telegram Replicator Service" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Description</label>
+          <textarea name="description" placeholder="Syncs telegram channel messages..." class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none"></textarea>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showCreateModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Register App</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

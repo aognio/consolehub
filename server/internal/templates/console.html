@@ -1,0 +1,120 @@
+{{define "content"}}
+<div class="space-y-4 h-[calc(100vh-6rem)] flex flex-col" x-data="consoleViewer('{{.Run.ID}}')">
+  <!-- Console Controls Header -->
+  <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center space-x-3">
+      <span class="font-bold text-lg">Process Console:</span>
+      <span class="font-mono text-sm px-2.5 py-1 rounded bg-gray-100 dark:bg-gray-700">{{.Run.ID}}</span>
+      <span class="text-xs text-gray-500 font-mono">PID {{.Run.PID}}</span>
+    </div>
+
+    <!-- Toolbar Buttons -->
+    <div class="flex items-center space-x-2">
+      <!-- Search Filter -->
+      <input type="text" x-model="searchQuery" placeholder="Filter console lines..." class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none w-48">
+
+      <!-- Auto Scroll Toggle -->
+      <button @click="autoScroll = !autoScroll" :class="autoScroll ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+        Auto-Scroll: <span x-text="autoScroll ? 'ON' : 'OFF'"></span>
+      </button>
+
+      <!-- Pause / Resume Toggle -->
+      <button @click="paused = !paused" :class="paused ? 'bg-amber-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+        <span x-text="paused ? 'Resume' : 'Pause'"></span>
+      </button>
+
+      <!-- Clear Buffer -->
+      <button @click="lines = []" class="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-xs font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+        Clear
+      </button>
+
+      <!-- Copy / Download -->
+      <button @click="downloadLogs()" class="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-xs font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+        Download
+      </button>
+    </div>
+  </div>
+
+  <!-- Terminal Window -->
+  <div id="console-terminal" class="flex-1 bg-gray-950 text-gray-100 font-mono text-sm p-4 rounded-xl overflow-y-auto border border-gray-800 space-y-1 shadow-inner select-text">
+    <template x-for="(line, index) in filteredLines" :key="index">
+      <div class="flex items-start space-x-3 hover:bg-gray-900/60 p-0.5 rounded group">
+        <span class="text-xs text-gray-600 select-none w-16 text-right" x-text="line.sequence"></span>
+        <span class="text-xs text-gray-500 select-none" x-text="line.timestamp"></span>
+        
+        <span x-show="line.stream === 'stdout'" class="text-xs text-blue-400 font-semibold select-none">[stdout]</span>
+        <span x-show="line.stream === 'stderr'" class="text-xs text-rose-400 font-semibold select-none">[stderr]</span>
+        <span x-show="line.stream === 'log'" class="text-xs text-emerald-400 font-semibold select-none">[log]</span>
+
+        <div class="flex-1 break-all">
+          <template x-if="line.kind === 'json'">
+            <details class="cursor-pointer">
+              <summary class="text-amber-300 hover:underline" x-text="line.text"></summary>
+              <pre class="bg-gray-900 p-2 rounded text-xs text-emerald-300 mt-1" x-text="formatJSON(line.text)"></pre>
+            </details>
+          </template>
+          <template x-if="line.kind !== 'json'">
+            <span x-text="line.text"></span>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <div x-show="lines.length === 0" class="text-gray-600 italic p-4 text-center">
+      Waiting for live stream telemetry...
+    </div>
+  </div>
+</div>
+
+<script>
+  function consoleViewer(runID) {
+    return {
+      runID: runID,
+      lines: [
+        { sequence: 1, timestamp: '17:55:01', stream: 'stdout', kind: 'text', text: 'Initializing process runner...' },
+        { sequence: 2, timestamp: '17:55:02', stream: 'log', kind: 'json', text: '{"level":"info","event":"started","pid":42817}' },
+        { sequence: 3, timestamp: '17:55:05', stream: 'stdout', kind: 'text', text: 'Downloading package artifacts...' }
+      ],
+      searchQuery: '',
+      autoScroll: true,
+      paused: false,
+      init() {
+        // Setup SSE listener for live lines
+        const evtSource = new EventSource(`/api/v1/runs/live?run_id=${this.runID}`);
+        evtSource.onmessage = (event) => {
+          if (this.paused) return;
+          try {
+            const data = JSON.parse(event.data);
+            this.lines.push(data);
+            if (this.autoScroll) {
+              this.$nextTick(() => {
+                const el = document.getElementById('console-terminal');
+                el.scrollTop = el.scrollHeight;
+              });
+            }
+          } catch(e) {}
+        };
+      },
+      get filteredLines() {
+        if (!this.searchQuery) return this.lines;
+        return this.lines.filter(l => l.text.toLowerCase().includes(this.searchQuery.toLowerCase()));
+      },
+      formatJSON(raw) {
+        try {
+          return JSON.stringify(JSON.parse(raw), null, 2);
+        } catch(e) {
+          return raw;
+        }
+      },
+      downloadLogs() {
+        const text = this.lines.map(l => `[${l.timestamp}] [${l.stream}] ${l.text}`).join('\n');
+        const blob = new Blob([text], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `console-log-${this.runID}.txt`;
+        a.click();
+      }
+    }
+  }
+</script>
+{{end}}
