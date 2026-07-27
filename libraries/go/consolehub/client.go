@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 
 	"github.com/aognio/consolehub/libraries/go/consolehub/events"
 	"github.com/aognio/consolehub/libraries/go/consolehub/progress"
@@ -16,12 +17,13 @@ import (
 )
 
 type Client struct {
-	opts    Options
-	q       *queue.BoundedQueue
-	w       *worker.Worker
-	stdoutW *writer.StreamWriter
-	stderrW *writer.StreamWriter
-	cancel  context.CancelFunc
+	opts     Options
+	q        *queue.BoundedQueue
+	w        *worker.Worker
+	stdoutW  *writer.StreamWriter
+	stderrW  *writer.StreamWriter
+	cancel   context.CancelFunc
+	disabled atomic.Bool
 }
 
 func New(optFns ...Option) (*Client, error) {
@@ -68,8 +70,19 @@ func New(optFns ...Option) (*Client, error) {
 		stderrW: writer.Stderr(q),
 		cancel:  cancel,
 	}
+	c.disabled.Store(opts.Disabled)
 
 	return c, nil
+}
+
+// SetDisabled dynamically enables or disables sending messages/telemetry to ConsoleHub.
+func (c *Client) SetDisabled(disabled bool) {
+	c.disabled.Store(disabled)
+}
+
+// IsDisabled returns whether sending telemetry messages to ConsoleHub is currently disabled.
+func (c *Client) IsDisabled() bool {
+	return c.disabled.Load()
 }
 
 func (c *Client) Close() error {
@@ -100,19 +113,25 @@ func (c *Client) Stderr() io.Writer { return c.stderrW }
 func (c *Client) Print(v ...any) {
 	str := fmt.Sprint(v...)
 	fmt.Print(str)
-	c.q.Push(events.NewTextLine(events.StreamStdout, str))
+	if !c.IsDisabled() {
+		c.q.Push(events.NewTextLine(events.StreamStdout, str))
+	}
 }
 
 func (c *Client) Printf(format string, v ...any) {
 	str := fmt.Sprintf(format, v...)
 	fmt.Print(str)
-	c.q.Push(events.NewTextLine(events.StreamStdout, str))
+	if !c.IsDisabled() {
+		c.q.Push(events.NewTextLine(events.StreamStdout, str))
+	}
 }
 
 func (c *Client) Println(v ...any) {
 	str := fmt.Sprintln(v...)
 	fmt.Print(str)
-	c.q.Push(events.NewTextLine(events.StreamStdout, str))
+	if !c.IsDisabled() {
+		c.q.Push(events.NewTextLine(events.StreamStdout, str))
+	}
 }
 
 func (c *Client) Fprint(w io.Writer, v ...any) {
@@ -142,7 +161,7 @@ func (c *Client) Warnf(format string, v ...any)  { c.log("warn", fmt.Sprintf(for
 func (c *Client) Errorf(format string, v ...any) { c.log("error", fmt.Sprintf(format, v...), nil) }
 
 func (c *Client) Log(evt events.Event) {
-	if evt != nil {
+	if evt != nil && !c.IsDisabled() {
 		c.q.Push(evt)
 	}
 }
@@ -154,7 +173,9 @@ func (c *Client) Report(evt events.Event) {
 func (c *Client) log(level, message string, fields map[string]any) {
 	evt := events.NewLogEvent(level, message, fields)
 	fmt.Printf("[%s] %s\n", level, message)
-	c.q.Push(evt)
+	if !c.IsDisabled() {
+		c.q.Push(evt)
+	}
 }
 
 // Progress Trackers

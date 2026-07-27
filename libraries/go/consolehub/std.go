@@ -33,6 +33,26 @@ func Close() error {
 	return nil
 }
 
+// Disable globally disables sending telemetry messages to ConsoleHub.
+func Disable() {
+	SetDisabled(true)
+}
+
+// Enable globally enables sending telemetry messages to ConsoleHub.
+func Enable() {
+	SetDisabled(false)
+}
+
+// SetDisabled globally enables or disables sending telemetry messages to ConsoleHub.
+func SetDisabled(disabled bool) {
+	Default().SetDisabled(disabled)
+}
+
+// IsDisabled returns whether sending telemetry messages to ConsoleHub is globally disabled.
+func IsDisabled() bool {
+	return Default().IsDisabled()
+}
+
 // Global Standard Helpers
 func Print(v ...any)                 { Default().Print(v...) }
 func Printf(format string, v ...any) { Default().Printf(format, v...) }

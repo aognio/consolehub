@@ -13,6 +13,7 @@ import (
 	"consolehub/internal/api/jsonrpc"
 	"consolehub/internal/auth"
 	"consolehub/internal/config"
+	"consolehub/internal/logger"
 	"consolehub/internal/middleware"
 	"consolehub/internal/models"
 	"consolehub/internal/services"
@@ -68,8 +69,20 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	l, err := logger.Init(cfg.Logging)
+	if err != nil {
+		log.Printf("Warning: failed to initialize logger: %v", err)
+	} else {
+		defer l.Close()
+		l.Info("server", "ConsoleHub server initializing", map[string]any{
+			"version":  version.Version,
+			"log_file": cfg.Logging.LogFile,
+		})
+	}
+
 	store, err := storage.New(cfg)
 	if err != nil {
+		logger.Error("server", "Failed to initialize storage", map[string]any{"error": err.Error()})
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 

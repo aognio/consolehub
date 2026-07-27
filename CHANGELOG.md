@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2026-07-27
+
+### Added
+- **Unauthenticated `healthz` JSON-RPC Procedure**:
+  - Added an unauthenticated `healthz` (and `system.healthz`) JSON-RPC 2.0 procedure returning server status (`"ok"`), server version (`"v0.1.2"`), and timestamp.
+- **Tenant Management JSON-RPC Procedures**:
+  - Added authenticated `tenant.info` procedure returning full metadata for the authenticated tenant.
+  - Added authenticated `tenant.app_list` procedure returning all applications associated with the tenant.
+- **Go Client Library Protocol Extensions**:
+  - Added `MethodHealthz`, `MethodTenantInfo`, `MethodTenantAppList` constants and `HealthzResult`, `TenantInfoResult`, `TenantAppListResult` structs to `libraries/go/consolehub/protocol/protocol.go`.
+- **Global Telemetry Disable Control**:
+  - Added global helper functions `consolehub.Disable()`, `consolehub.Enable()`, `consolehub.SetDisabled(bool)`, and `consolehub.IsDisabled()` to globally toggle sending telemetry messages while preserving local standard terminal output.
+  - Added dynamic instance methods `client.SetDisabled(bool)` and `client.IsDisabled()` on `*consolehub.Client`.
+  - Expanded `CONSOLEHUB_DISABLED` environment variable recognition to accept `"true"`, `"1"`, or `"yes"`.
+- **Automatic Host Machine Registration & Tenant Association**:
+  - Telemetry clients connecting from new host machines now automatically register the host machine (`slug = hostname`) and associate it with the registering tenant, allowing clients to ingest telemetry out-of-the-box without requiring manual host pre-creation.
+- **Web Console Process Runs Filtering & ViewModel Resolution**:
+  - Filtered `/runs` page by active tenant cookie selection so runs are displayed per tenant.
+  - Resolved `App` and `Host` models in `RunViewModel` so application names and hostnames are cleanly rendered on `/runs`.
+- **Structured JSONL Server Logging**:
+  - Added structured JSON Lines (`.jsonl`) logging package (`server/internal/logger`).
+  - Added `[logging]` TOML configuration options (`log_path = "/var/log/consolehub/consolehub.jsonl"` / `log_file`, `log_level = "debug"`).
+  - Logs HTTP requests, WebSocket connection events, JSON-RPC procedures (`process.register`, `stream.append`, `auth.authenticate`), and errors to the configured `.jsonl` log file (with automatic fallback to `./consolehub.log` if target directory permissions fail).
+- **Documentation & Agent Skill Updates**:
+  - Updated `docs/jsonrpc-websocket.md` and `skills/consolehub/SKILL.md` with procedure references and payload schemas.
+
+---
+
 ## [0.1.1] - 2026-07-27
 
 ### Added

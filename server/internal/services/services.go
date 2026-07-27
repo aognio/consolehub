@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
@@ -250,6 +251,18 @@ func (s *Services) SyncHostTenants(ctx context.Context, hostID string, tenantIDs
 // -------------------------------------------------------------------
 
 func (s *Services) CreateApp(ctx context.Context, tenantID, name, displayName, description string) (*models.App, error) {
+	if name == "" {
+		name = "default-app"
+	}
+	if displayName == "" {
+		displayName = name
+	}
+
+	existing, err := s.GetAppByName(ctx, tenantID, name)
+	if err == nil && existing != nil {
+		return existing, nil
+	}
+
 	col, err := s.store.App.FindCollectionByNameOrId("ch_apps")
 	if err != nil {
 		return nil, err
@@ -294,8 +307,47 @@ func (s *Services) GetAppByName(ctx context.Context, tenantID, name string) (*mo
 	}, nil
 }
 
+func (s *Services) GetAppByID(ctx context.Context, id string) (*models.App, error) {
+	rec, err := s.store.App.FindRecordById("ch_apps", id)
+	if err != nil {
+		return nil, ErrAppNotFound
+	}
+	return &models.App{
+		ID:          rec.Id,
+		TenantID:    rec.GetString("tenant_id"),
+		Name:        rec.GetString("name"),
+		DisplayName: rec.GetString("display_name"),
+		Description: rec.GetString("description"),
+		CreatedAt:   rec.GetDateTime("created").Time(),
+		UpdatedAt:   rec.GetDateTime("updated").Time(),
+	}, nil
+}
+
 func (s *Services) ListApps(ctx context.Context) ([]*models.App, error) {
 	recs, err := s.store.App.FindRecordsByFilter("ch_apps", "", "+name", 500, 0)
+	if err != nil {
+		return nil, err
+	}
+	apps := make([]*models.App, 0, len(recs))
+	for _, r := range recs {
+		apps = append(apps, &models.App{
+			ID:          r.Id,
+			TenantID:    r.GetString("tenant_id"),
+			Name:        r.GetString("name"),
+			DisplayName: r.GetString("display_name"),
+			Description: r.GetString("description"),
+			CreatedAt:   r.GetDateTime("created").Time(),
+			UpdatedAt:   r.GetDateTime("updated").Time(),
+		})
+	}
+	return apps, nil
+}
+
+func (s *Services) ListAppsByTenant(ctx context.Context, tenantID string) ([]*models.App, error) {
+	if tenantID == "" {
+		return s.ListApps(ctx)
+	}
+	recs, err := s.store.App.FindRecordsByFilter("ch_apps", "tenant_id = {:tenant_id}", "+name", 500, 0, dbx.Params{"tenant_id": tenantID})
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +404,11 @@ func (s *Services) DeleteApp(ctx context.Context, id string) error {
 // -------------------------------------------------------------------
 
 func (s *Services) RegisterProcessRun(ctx context.Context, p RegisterRunParams) (*models.Run, error) {
-	if p.ClientRunID != "" {
+	if p.ClientRunID == "" {
+		b := make([]byte, 8)
+		_, _ = rand.Read(b)
+		p.ClientRunID = fmt.Sprintf("run-%d-%x", time.Now().UnixNano(), b)
+	} else {
 		existing, err := s.GetRunByClientRunID(ctx, p.TenantID, p.ClientRunID)
 		if err == nil && existing != nil {
 			return existing, nil
@@ -441,6 +497,24 @@ func (s *Services) GetRunByClientRunID(ctx context.Context, tenantID, clientRunI
 
 func (s *Services) ListRuns(ctx context.Context) ([]*models.Run, error) {
 	recs, err := s.store.App.FindRecordsByFilter("ch_runs", "", "-started_at", 500, 0)
+	if err != nil {
+		return nil, err
+	}
+	runs := make([]*models.Run, 0, len(recs))
+	for _, r := range recs {
+		run, err := s.GetRunByID(ctx, r.Id)
+		if err == nil {
+			runs = append(runs, run)
+		}
+	}
+	return runs, nil
+}
+
+func (s *Services) ListRunsByTenant(ctx context.Context, tenantID string) ([]*models.Run, error) {
+	if tenantID == "" {
+		return s.ListRuns(ctx)
+	}
+	recs, err := s.store.App.FindRecordsByFilter("ch_runs", "tenant_id = {:tenant_id}", "-started_at", 500, 0, dbx.Params{"tenant_id": tenantID})
 	if err != nil {
 		return nil, err
 	}

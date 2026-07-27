@@ -37,7 +37,8 @@ func defaultOptions() Options {
 	if app == "" {
 		app = "go-app"
 	}
-	disabled := os.Getenv("CONSOLEHUB_DISABLED") == "true"
+	disEnv := os.Getenv("CONSOLEHUB_DISABLED")
+	disabled := disEnv == "true" || disEnv == "1" || disEnv == "yes"
 
 	return Options{
 		Endpoint:      endpoint,

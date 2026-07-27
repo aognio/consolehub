@@ -176,9 +176,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.handleRunPost(w, r)
 			return
 		}
-		runs, _ := h.services.ListRuns(r.Context())
+		activeTenantID := h.getActiveTenantID(r)
+		runs, _ := h.services.ListRunsByTenant(r.Context(), activeTenantID)
+
+		type RunViewModel struct {
+			*models.Run
+			App  *models.App
+			Host *models.Host
+		}
+
+		runVMs := make([]RunViewModel, 0, len(runs))
+		for _, run := range runs {
+			appObj, _ := h.services.GetAppByID(r.Context(), run.AppID)
+			hostObj, _ := h.services.GetHostByID(r.Context(), run.HostID)
+			runVMs = append(runVMs, RunViewModel{
+				Run:  run,
+				App:  appObj,
+				Host: hostObj,
+			})
+		}
+
 		_ = h.tmpl.Render(w, "runs.html", h.preparePageData(r, "Runs", map[string]any{
-			"Runs": runs,
+			"Runs": runVMs,
 		}))
 
 	case "/search":

@@ -13,6 +13,23 @@ type Config struct {
 	Server     ServerConfig     `toml:"server"`
 	Security   SecurityConfig   `toml:"security"`
 	PocketBase PocketBaseConfig `toml:"pocketbase"`
+	Logging    LoggingConfig    `toml:"logging"`
+}
+
+type LoggingConfig struct {
+	LogFile  string `toml:"log_file"`
+	LogPath  string `toml:"log_path"`
+	LogLevel string `toml:"log_level"`
+}
+
+func (l LoggingConfig) ResolvedLogPath() string {
+	if l.LogPath != "" {
+		return l.LogPath
+	}
+	if l.LogFile != "" {
+		return l.LogFile
+	}
+	return "/var/log/consolehub/consolehub.log"
 }
 
 type ServerConfig struct {
@@ -59,6 +76,10 @@ func Default() *Config {
 		},
 		PocketBase: PocketBaseConfig{
 			DataDir: "./pb_data",
+		},
+		Logging: LoggingConfig{
+			LogFile:  "/var/log/consolehub/consolehub.log",
+			LogLevel: "debug",
 		},
 	}
 }

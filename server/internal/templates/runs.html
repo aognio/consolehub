@@ -23,35 +23,35 @@
         {{range .Runs}}
         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
           <td class="px-6 py-4 font-medium">
-            {{if eq .Status "running"}}
+            {{if eq .Run.Status "running"}}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">
               <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
               running
             </span>
-            {{else if eq .Status "exited"}}
+            {{else if eq .Run.Status "exited"}}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
               exited
             </span>
             {{else}}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300">
-              {{.Status}}
+              {{.Run.Status}}
             </span>
             {{end}}
           </td>
-          <td class="px-6 py-4 font-semibold">{{.AppID}}</td>
-          <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{.HostID}}</td>
-          <td class="px-6 py-4 font-mono">{{.PID}}</td>
-          <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{formatTime .StartedAt}}</td>
+          <td class="px-6 py-4 font-semibold">{{if .App}}{{.App.Name}}{{else}}{{.Run.AppID}}{{end}}</td>
+          <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{if .Host}}{{.Host.Hostname}}{{else}}{{.Run.HostID}}{{end}}</td>
+          <td class="px-6 py-4 font-mono">{{.Run.PID}}</td>
+          <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{formatTime .Run.StartedAt}}</td>
           <td class="px-6 py-4 text-right space-x-2">
-            <a href="/runs/{{.ID}}/console" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition">
+            <a href="/runs/{{.Run.ID}}/console" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition">
               Open Console
             </a>
-            <button @click="editRunID = '{{.ID}}'; editStatus = '{{.Status}}'; editExitCode = '{{.ExitCode}}'; showStatusModal = true" class="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition">
+            <button @click="editRunID = '{{.Run.ID}}'; editStatus = '{{.Run.Status}}'; editExitCode = '{{.Run.ExitCode}}'; showStatusModal = true" class="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition">
               Edit Status
             </button>
             <form action="/runs" method="POST" class="inline">
               <input type="hidden" name="action" value="delete">
-              <input type="hidden" name="run_id" value="{{.ID}}">
+              <input type="hidden" name="run_id" value="{{.Run.ID}}">
               <button type="submit" class="px-2 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 rounded transition">
                 Delete
               </button>

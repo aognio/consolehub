@@ -27,15 +27,35 @@ import "github.com/aognio/consolehub/libraries/go/consolehub"
   * `OSName`: Operating System name (auto-detected via `runtime.GOOS`, or overridden via `consolehub.WithOSName("linux")`).
 
 ### Option A: Standard Global Default Client
-Auto-configures from environment variables (`CONSOLEHUB_ENDPOINT`, `CONSOLEHUB_TOKEN`, `CONSOLEHUB_TENANT`, `CONSOLEHUB_APP`).
+Auto-configures from environment variables (`CONSOLEHUB_ENDPOINT`, `CONSOLEHUB_TOKEN`, `CONSOLEHUB_TENANT`, `CONSOLEHUB_APP`, `CONSOLEHUB_DISABLED`).
 
 ```go
 func main() {
     defer consolehub.Close()
 
+    // Optionally disable telemetry transmission globally
+    // consolehub.Disable()
+
     consolehub.Println("Application starting up...")
 }
 ```
+
+### Globally Disabling Telemetry Transmission
+You can disable sending telemetry/log messages to ConsoleHub while retaining standard local stdout/stderr terminal printing:
+
+* **Environment Variable**: Set `CONSOLEHUB_DISABLED=true` (or `1`, `yes`).
+* **Global Helpers**:
+  ```go
+  consolehub.Disable()                 // Disables forwarding replacement functions to ConsoleHub
+  consolehub.Enable()                  // Re-enables forwarding replacement functions to ConsoleHub
+  consolehub.SetDisabled(true)         // Set global disabled state
+  disabled := consolehub.IsDisabled() // Check global disabled state
+  ```
+* **Client Instance Methods**:
+  ```go
+  client.SetDisabled(true)            // Toggle telemetry transmission dynamically on client instance
+  disabled := client.IsDisabled()
+  ```
 
 ### Option B: Custom Explicit Client
 ```go
@@ -128,3 +148,25 @@ if consolehub.Confirm("Proceed with database migration?", true) {
 // Choice Selection
 env := consolehub.Choice("Select environment", []string{"Development", "Staging", "Production"}, "Development")
 ```
+
+---
+
+## 3. Low-Level Protocol Package & JSON-RPC Procedure Constants
+
+Import low-level protocol definitions:
+```go
+import "github.com/aognio/consolehub/libraries/go/consolehub/protocol"
+```
+
+### Complete JSON-RPC Procedure Constants:
+| Procedure Constant | JSON-RPC Method Name | Description | Required Auth |
+| :--- | :--- | :--- | :--- |
+| `protocol.MethodHealthz` | `"healthz"` | System status check (`HealthzResult`) | Unauthenticated |
+| `protocol.MethodAuthAuthenticate` | `"auth.authenticate"` | Session authentication (`AuthParams`, `AuthResult`) | Unauthenticated |
+| `protocol.MethodTenantInfo` | `"tenant.info"` | Tenant metadata (`TenantInfoParams`, `TenantInfoResult`) | Authenticated |
+| `protocol.MethodTenantAppList` | `"tenant.app_list"` | Application listing (`TenantAppListParams`, `TenantAppListResult`) | Authenticated |
+| `protocol.MethodProcessRegister` | `"process.register"` | Run registration (`ProcessRegisterParams`, `ProcessRegisterResult`) | Authenticated |
+| `protocol.MethodStreamAppend` | `"stream.append"` | Batch stream ingestion (`StreamAppendParams`, `StreamAppendResult`) | Authenticated |
+| `protocol.MethodStreamResume` | `"stream.resume"` | Reconnection replay (`StreamResumeParams`, `StreamResumeResult`) | Authenticated |
+| `protocol.MethodProcessFinish` | `"process.finish"` | Execution completion (`ProcessFinishParams`) | Authenticated |
+| `protocol.MethodProcessHeartbeat` | `"process.heartbeat"` | Keepalive ping (`connection.ping` / `process.heartbeat`) | Authenticated |

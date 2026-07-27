@@ -49,3 +49,43 @@ func TestClient_PublicAPI(t *testing.T) {
 		t.Errorf("failed to close client: %v", err)
 	}
 }
+
+func TestClient_DisabledFlag(t *testing.T) {
+	client, err := consolehub.New(consolehub.WithDisabled(true))
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	defer client.Close()
+
+	if !client.IsDisabled() {
+		t.Errorf("expected client to be disabled")
+	}
+
+	client.SetDisabled(false)
+	if client.IsDisabled() {
+		t.Errorf("expected client to be enabled after SetDisabled(false)")
+	}
+
+	client.SetDisabled(true)
+	if !client.IsDisabled() {
+		t.Errorf("expected client to be disabled after SetDisabled(true)")
+	}
+
+	// Replacement functions should execute without error when disabled
+	client.Println("This message will not be sent to ConsoleHub")
+	client.Infof("Local log only")
+}
+
+func TestGlobal_DisableEnable(t *testing.T) {
+	consolehub.Disable()
+	if !consolehub.IsDisabled() {
+		t.Errorf("expected global consolehub to be disabled")
+	}
+
+	consolehub.Println("Global disabled print test")
+
+	consolehub.Enable()
+	if consolehub.IsDisabled() {
+		t.Errorf("expected global consolehub to be enabled")
+	}
+}

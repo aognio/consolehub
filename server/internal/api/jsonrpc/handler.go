@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"consolehub/internal/config"
+	"consolehub/internal/logger"
 	"consolehub/internal/models"
 	"consolehub/internal/services"
 	"consolehub/internal/stream"
+	"consolehub/internal/version"
 
 	"github.com/gorilla/websocket"
 )
@@ -110,11 +112,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleRequest(ctx context.Context, session *connectionSession, req *Request) *Response {
+	resp := h.dispatchRequest(ctx, session, req)
+	if resp != nil && resp.Error != nil {
+		logger.Error("jsonrpc", fmt.Sprintf("Procedure '%s' failed", req.Method), map[string]any{
+			"method": req.Method,
+			"code":   resp.Error.Code,
+			"error":  resp.Error.Message,
+			"req_id": req.ID,
+		})
+	}
+	return resp
+}
+
+func (h *Handler) dispatchRequest(ctx context.Context, session *connectionSession, req *Request) *Response {
 	if req.JSONRPC != "2.0" {
 		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error:   &Error{Code: ErrCodeInvalidRequest, Message: "Invalid JSON-RPC version"},
+		}
+	}
+
+	if req.Method == "healthz" || req.Method == "system.healthz" {
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]any{
+				"status":    "ok",
+				"version":   version.Version,
+				"timestamp": time.Now().Format(time.RFC3339),
+			},
 		}
 	}
 
@@ -152,6 +179,108 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 	}
 
 	switch req.Method {
+	case "tenant.info":
+		tenantID := session.tenantID
+		var params struct {
+			Tenant string `json:"tenant"`
+		}
+		if len(req.Params) > 0 {
+			_ = json.Unmarshal(req.Params, &params)
+		}
+
+		var tenant *models.Tenant
+		var err error
+		if params.Tenant != "" {
+			tenant, err = h.services.GetTenantBySlug(ctx, params.Tenant)
+		} else if tenantID != "" {
+			tenant, err = h.services.GetTenantByID(ctx, tenantID)
+		} else {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInvalidParams, Message: "Tenant parameter is required"},
+			}
+		}
+
+		if err != nil || tenant == nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Tenant not found"},
+			}
+		}
+
+		if session.tenantID != "" && session.tenantID != tenant.ID {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeUnauthorized, Message: "API key does not belong to the requested tenant"},
+			}
+		}
+
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  tenant,
+		}
+
+	case "tenant.app_list":
+		tenantID := session.tenantID
+		var params struct {
+			Tenant string `json:"tenant"`
+		}
+		if len(req.Params) > 0 {
+			_ = json.Unmarshal(req.Params, &params)
+		}
+
+		var tenant *models.Tenant
+		var err error
+		if params.Tenant != "" {
+			tenant, err = h.services.GetTenantBySlug(ctx, params.Tenant)
+		} else if tenantID != "" {
+			tenant, err = h.services.GetTenantByID(ctx, tenantID)
+		} else {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInvalidParams, Message: "Tenant parameter is required"},
+			}
+		}
+
+		if err != nil || tenant == nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeTenantNotFound, Message: "Tenant not found"},
+			}
+		}
+
+		if session.tenantID != "" && session.tenantID != tenant.ID {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeUnauthorized, Message: "API key does not belong to the requested tenant"},
+			}
+		}
+
+		apps, err := h.services.ListAppsByTenant(ctx, tenant.ID)
+		if err != nil {
+			return &Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &Error{Code: ErrCodeInternalError, Message: err.Error()},
+			}
+		}
+
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]any{
+				"tenant_id": tenant.ID,
+				"apps":      apps,
+			},
+		}
+
 	case "process.register":
 		var params struct {
 			Tenant  string `json:"tenant"`
@@ -224,40 +353,56 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 			hostSlug = params.Host.Hostname
 		}
 
+		var host *models.Host
 		existingHost, err := h.services.GetHostBySlug(ctx, hostSlug)
 		if err != nil && params.Host.Hostname != "" && hostSlug != params.Host.Hostname {
 			existingHost, err = h.services.GetHostBySlug(ctx, params.Host.Hostname)
 		}
 
-		if err != nil || existingHost == nil {
-			return &Response{
-				JSONRPC: "2.0",
-				ID:      req.ID,
-				Error:   &Error{Code: ErrCodeInvalidParams, Message: fmt.Sprintf("Host '%s' not found. The hostname sent must match the slug of an existing host associated to tenant '%s'", hostSlug, tenant.Slug)},
+		if err == nil && existingHost != nil {
+			associatedTenants, err := h.services.ListTenantsByHost(ctx, existingHost.ID)
+			isAssociated := false
+			if err == nil && len(associatedTenants) > 0 {
+				for _, t := range associatedTenants {
+					if t.ID == tenant.ID {
+						isAssociated = true
+						break
+					}
+				}
+				if !isAssociated {
+					return &Response{
+						JSONRPC: "2.0",
+						ID:      req.ID,
+						Error:   &Error{Code: ErrCodeUnauthorized, Message: fmt.Sprintf("Host '%s' is not associated to tenant '%s'", existingHost.Slug, tenant.Slug)},
+					}
+				}
+			} else {
+				_ = h.services.AssociateHostTenant(ctx, existingHost.ID, tenant.ID)
 			}
-		}
-
-		associatedTenants, err := h.services.ListTenantsByHost(ctx, existingHost.ID)
-		isAssociated := false
-		if err == nil {
-			for _, t := range associatedTenants {
-				if t.ID == tenant.ID {
-					isAssociated = true
-					break
+			host, _ = h.services.RegisterHost(ctx, existingHost.Slug, params.Host.Hostname, params.Host.FQDN, params.Host.DisplayName, params.Host.Platform)
+		} else {
+			host, err = h.services.RegisterHost(ctx, hostSlug, params.Host.Hostname, params.Host.FQDN, params.Host.DisplayName, params.Host.Platform)
+			if err != nil || host == nil {
+				return &Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &Error{Code: ErrCodeInternalError, Message: "Failed to register host machine"},
 				}
 			}
+			_ = h.services.AssociateHostTenant(ctx, host.ID, tenant.ID)
 		}
-
-		if !isAssociated {
+		appName := params.App
+		if appName == "" {
+			appName = "default-app"
+		}
+		app, err := h.services.CreateApp(ctx, tenant.ID, appName, appName, "")
+		if err != nil || app == nil {
 			return &Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
-				Error:   &Error{Code: ErrCodeUnauthorized, Message: fmt.Sprintf("Host '%s' is not associated to tenant '%s'", existingHost.Slug, tenant.Slug)},
+				Error:   &Error{Code: ErrCodeInternalError, Message: "Failed to resolve app"},
 			}
 		}
-
-		host, _ := h.services.RegisterHost(ctx, existingHost.Slug, params.Host.Hostname, params.Host.FQDN, params.Host.DisplayName, params.Host.Platform)
-		app, _ := h.services.CreateApp(ctx, tenant.ID, params.App, params.App, "")
 
 		startedAt, _ := time.Parse(time.RFC3339, params.Process.StartedAt)
 		if startedAt.IsZero() {
@@ -282,6 +427,14 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 				Error:   &Error{Code: ErrCodeInternalError, Message: err.Error()},
 			}
 		}
+
+		logger.Info("jsonrpc", "Process run registered successfully", map[string]any{
+			"process_id":    run.ID,
+			"client_run_id": run.ClientRunID,
+			"tenant":        tenant.Slug,
+			"app":           app.Name,
+			"host":          host.Hostname,
+		})
 
 		return &Response{
 			JSONRPC: "2.0",
@@ -343,6 +496,14 @@ func (h *Handler) handleRequest(ctx context.Context, session *connectionSession,
 				Error:   &Error{Code: ErrCodeProcessNotFound, Message: "Process not found"},
 			}
 		}
+
+		logger.Debug("jsonrpc", "Appended stream lines", map[string]any{
+			"process_id":       params.ProcessID,
+			"batch_id":         params.BatchID,
+			"accepted_through": acceptedThrough,
+			"lines_count":      len(streamLines),
+			"duplicate":        dup,
+		})
 
 		return &Response{
 			JSONRPC: "2.0",

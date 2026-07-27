@@ -4,7 +4,7 @@ import "fmt"
 
 var (
 	// Version holds the current release version of ConsoleHub.
-	Version = "v0.1.1"
+	Version = "v0.1.2"
 
 	// GitCommit holds the short git commit hash set via -ldflags during build.
 	GitCommit = "none"

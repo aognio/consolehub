@@ -44,7 +44,8 @@ session_duration = "12h"
 data_dir = "/var/lib/consolehub/data"
 
 [logging]
-level = "debug"
+log_path = "/var/log/consolehub/consolehub.jsonl"
+log_level = "debug"
 retention_days = 60
 `
 	tmpDir := t.TempDir()
@@ -63,5 +64,8 @@ retention_days = 60
 	}
 	if cfg.Server.PublicURL != "https://consolehub.example.com:3787" {
 		t.Errorf("expected public_url match, got '%s'", cfg.Server.PublicURL)
+	}
+	if cfg.Logging.ResolvedLogPath() != "/var/log/consolehub/consolehub.jsonl" {
+		t.Errorf("expected resolved log path '/var/log/consolehub/consolehub.jsonl', got '%s'", cfg.Logging.ResolvedLogPath())
 	}
 }
