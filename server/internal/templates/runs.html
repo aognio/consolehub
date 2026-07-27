@@ -1,0 +1,98 @@
+{{define "content"}}
+<div class="space-y-6" x-data="{ showStatusModal: false, editRunID: '', editStatus: '', editExitCode: 0 }">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Running & Historical Process Runs</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Monitor active and historical command-line process executions</p>
+    </div>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-gray-500 uppercase text-xs">
+        <tr>
+          <th class="px-6 py-3.5">Status</th>
+          <th class="px-6 py-3.5">App</th>
+          <th class="px-6 py-3.5">Host</th>
+          <th class="px-6 py-3.5">PID</th>
+          <th class="px-6 py-3.5">Started</th>
+          <th class="px-6 py-3.5 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        {{range .Runs}}
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+          <td class="px-6 py-4 font-medium">
+            {{if eq .Status "running"}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">
+              <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+              running
+            </span>
+            {{else if eq .Status "exited"}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+              exited
+            </span>
+            {{else}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300">
+              {{.Status}}
+            </span>
+            {{end}}
+          </td>
+          <td class="px-6 py-4 font-semibold">{{.AppID}}</td>
+          <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{.HostID}}</td>
+          <td class="px-6 py-4 font-mono">{{.PID}}</td>
+          <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{formatTime .StartedAt}}</td>
+          <td class="px-6 py-4 text-right space-x-2">
+            <a href="/runs/{{.ID}}/console" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition">
+              Open Console
+            </a>
+            <button @click="editRunID = '{{.ID}}'; editStatus = '{{.Status}}'; editExitCode = '{{.ExitCode}}'; showStatusModal = true" class="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition">
+              Edit Status
+            </button>
+            <form action="/runs" method="POST" class="inline">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="run_id" value="{{.ID}}">
+              <button type="submit" class="px-2 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 rounded transition">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No process runs registered yet.</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Edit Run Status Modal -->
+  <div x-show="showStatusModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Edit Run Status</h3>
+      <form action="/runs" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="update_status">
+        <input type="hidden" name="run_id" :value="editRunID">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Process Status</label>
+          <select name="status" :value="editStatus" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="running">running</option>
+            <option value="exited">exited</option>
+            <option value="crashed">crashed</option>
+            <option value="stopped">stopped</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Exit Code</label>
+          <input type="number" name="exit_code" :value="editExitCode" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showStatusModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Update Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

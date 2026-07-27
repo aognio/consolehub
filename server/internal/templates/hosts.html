@@ -1,0 +1,338 @@
+{{define "content"}}
+<div class="space-y-6" x-data="{
+    showCreateModal: false,
+    showEditModal: false,
+    showAssignModal: false,
+    editHostID: '',
+    editSlug: '',
+    editHostname: '',
+    editFQDN: '',
+    editDisplayName: '',
+    editPlatform: '',
+    editOnline: 'true',
+    assignHostID: '',
+    assignHostName: '',
+    assignSearch: '',
+    associatedTenantIDs: [],
+    allTenants: [
+      {{range .Tenants}}
+      { id: '{{.ID}}', name: '{{.Name}}', slug: '{{.Slug}}' },
+      {{end}}
+    ],
+    openAssignModal(hostID, hostName, tenantIDs) {
+        this.assignHostID = hostID;
+        this.assignHostName = hostName;
+        this.associatedTenantIDs = tenantIDs ? [...tenantIDs] : [];
+        this.assignSearch = '';
+        this.showAssignModal = true;
+    },
+    openEditModal(ds) {
+        this.editHostID = ds.hostId || '';
+        this.editSlug = ds.slug || '';
+        this.editHostname = ds.hostname || '';
+        this.editFQDN = ds.fqdn || '';
+        this.editDisplayName = ds.displayName || '';
+        this.editPlatform = ds.platform || 'linux';
+        this.editOnline = ds.online || 'true';
+        this.showEditModal = true;
+    },
+    isTenantAssociated(id) {
+        return this.associatedTenantIDs.includes(id);
+    },
+    toggleTenant(id) {
+        if (this.isTenantAssociated(id)) {
+            this.associatedTenantIDs = this.associatedTenantIDs.filter(t => t !== id);
+        } else {
+            this.associatedTenantIDs.push(id);
+        }
+    },
+    getTenantName(id) {
+        const t = this.allTenants.find(x => x.id === id);
+        return t ? t.name : id;
+    },
+    filteredTenants() {
+        if (!this.assignSearch.trim()) return this.allTenants;
+        const q = this.assignSearch.toLowerCase();
+        return this.allTenants.filter(t => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q));
+    }
+}">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Registered Hosts</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Remote machine nodes running telemetry host agents</p>
+    </div>
+    <button @click="showCreateModal = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition shadow">
+      + Register Host
+    </button>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-gray-500 uppercase text-xs">
+        <tr>
+          <th class="px-6 py-3.5">Slug</th>
+          <th class="px-6 py-3.5">Hostname / FQDN</th>
+          <th class="px-6 py-3.5">Display Name</th>
+          <th class="px-6 py-3.5">Associated Tenants</th>
+          <th class="px-6 py-3.5">Platform</th>
+          <th class="px-6 py-3.5">Status</th>
+          <th class="px-6 py-3.5">Last Seen</th>
+          <th class="px-6 py-3.5 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        {{range .Hosts}}
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+          <td class="px-6 py-4 font-mono font-semibold text-xs">
+            <span class="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
+              {{.Host.Slug}}
+            </span>
+          </td>
+          <td class="px-6 py-4 font-mono">
+            <div class="font-bold text-gray-900 dark:text-gray-100">{{.Host.Hostname}}</div>
+            {{if .Host.FQDN}}
+            <div class="text-xs text-gray-500 font-mono">{{.Host.FQDN}}</div>
+            {{end}}
+          </td>
+          <td class="px-6 py-4">{{if .Host.DisplayName}}{{.Host.DisplayName}}{{else}}<span class="text-gray-400 font-italic">None</span>{{end}}</td>
+          <td class="px-6 py-4">
+            <div class="flex flex-wrap gap-1.5 items-center">
+              {{range .Tenants}}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+                {{.Name}}
+                <form action="/hosts" method="POST" class="inline ml-1">
+                  <input type="hidden" name="action" value="dissociate_tenant">
+                  <input type="hidden" name="host_id" value="{{$.Host.ID}}">
+                  <input type="hidden" name="tenant_id" value="{{.ID}}">
+                  <button type="submit" title="Remove tenant association" class="text-blue-400 hover:text-rose-600 font-bold ml-1 transition">&times;</button>
+                </form>
+              </span>
+              {{else}}
+              <span class="text-xs text-gray-400 italic">None</span>
+              {{end}}
+            </div>
+          </td>
+          <td class="px-6 py-4 text-gray-500 capitalize">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              {{.Host.Platform}}
+            </span>
+          </td>
+          <td class="px-6 py-4">
+            {{if .Host.Online}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">Online</span>
+            {{else}}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">Offline</span>
+            {{end}}
+          </td>
+          <td class="px-6 py-4 text-gray-500">{{formatTime .Host.LastSeen}}</td>
+          <td class="px-6 py-4 text-right space-x-2">
+            <button type="button"
+                    data-host-id="{{.Host.ID}}"
+                    data-host-name="{{.Host.Hostname}}"
+                    data-tenant-ids="{{range $i, $t := .Tenants}}{{if $i}},{{end}}{{$t.ID}}{{end}}"
+                    @click="openAssignModal($el.dataset.hostId, $el.dataset.hostName, $el.dataset.tenantIds ? $el.dataset.tenantIds.split(',').filter(Boolean) : [])"
+                    class="px-2.5 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded transition">
+              Assing Tenants
+            </button>
+            <button type="button"
+                    data-host-id="{{.Host.ID}}"
+                    data-slug="{{.Host.Slug}}"
+                    data-hostname="{{.Host.Hostname}}"
+                    data-fqdn="{{.Host.FQDN}}"
+                    data-display-name="{{.Host.DisplayName}}"
+                    data-platform="{{.Host.Platform}}"
+                    data-online="{{.Host.Online}}"
+                    @click="openEditModal($el.dataset)"
+                    class="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition">
+              Edit
+            </button>
+            <form action="/hosts" method="POST" class="inline">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="host_id" value="{{.Host.ID}}">
+              <button type="submit" class="px-2.5 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 rounded transition">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="8" class="px-6 py-8 text-center text-gray-500">No registered hosts found.</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Edit Host Modal -->
+  <div x-show="showEditModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Edit Host Machine</h3>
+      <form action="/hosts" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="host_id" :value="editHostID">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Host Slug (Unique)</label>
+          <input type="text" name="slug" :value="editSlug" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Hostname</label>
+          <input type="text" name="hostname" :value="editHostname" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">FQDN</label>
+          <input type="text" name="fqdn" :value="editFQDN" placeholder="vps-01.example.com" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Display Name</label>
+          <input type="text" name="display_name" :value="editDisplayName" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Platform</label>
+          <select name="platform" :value="editPlatform" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="linux">Linux</option>
+            <option value="darwin">macOS</option>
+            <option value="windows">Windows</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Status</label>
+          <select name="online" :value="editOnline" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="true">Online</option>
+            <option value="false">Offline</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showEditModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manage / Assign Tenants Modal -->
+  <div x-show="showAssignModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-lg w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold">Manage Tenants for <span class="text-blue-600 dark:text-blue-400" x-text="assignHostName"></span></h3>
+        <button type="button" @click="showAssignModal = false" class="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+      </div>
+
+      <form action="/hosts" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="sync_tenants">
+        <input type="hidden" name="host_id" :value="assignHostID">
+
+        <!-- Hidden input for each checked tenant ID -->
+        <template x-for="tId in associatedTenantIDs" :key="tId">
+          <input type="hidden" name="tenant_ids" :value="tId">
+        </template>
+
+        <!-- Selected Tags Container -->
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1.5">Associated Tenants</label>
+          <div class="min-h-[44px] p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg flex flex-wrap gap-1.5 items-center">
+            <template x-for="tId in associatedTenantIDs" :key="tId">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700 shadow-sm">
+                <span x-text="getTenantName(tId)"></span>
+                <button type="button" @click="toggleTenant(tId)" class="ml-1.5 text-blue-500 hover:text-rose-600 font-bold text-sm leading-none transition">&times;</button>
+              </span>
+            </template>
+            <template x-if="associatedTenantIDs.length === 0">
+              <span class="text-xs text-gray-400 italic px-1">No tenants selected yet. Check boxes below to associate.</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Auto-complete Search Input -->
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Search Tenants</label>
+          <div class="relative">
+            <input type="text" x-model="assignSearch" placeholder="Type to filter tenants..." class="w-full pl-9 pr-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Checkbox Auto-Complete List -->
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Check / Uncheck Tenants</label>
+          <div class="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-700/50 bg-white dark:bg-gray-900">
+            <template x-for="tenant in filteredTenants()" :key="tenant.id">
+              <label class="flex items-center justify-between px-3.5 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer text-sm transition">
+                <div class="flex items-center space-x-3">
+                  <input type="checkbox" :checked="isTenantAssociated(tenant.id)" @change="toggleTenant(tenant.id)" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                  <span class="font-medium text-gray-800 dark:text-gray-200" x-text="tenant.name"></span>
+                </div>
+                <span class="font-mono text-xs text-gray-400" x-text="tenant.slug"></span>
+              </label>
+            </template>
+            <template x-if="filteredTenants().length === 0">
+              <div class="px-4 py-4 text-center text-xs text-gray-400">No tenants matching search query.</div>
+            </template>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end space-x-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+          <button type="button" @click="showAssignModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow">Save Associations</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Register Host Modal -->
+  <div x-show="showCreateModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-white dark:bg-gray-800 max-w-md w-full p-6 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <h3 class="text-lg font-bold">Register Host Machine</h3>
+      <form action="/hosts" method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="create">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Host Slug (Unique Identifier)</label>
+          <input type="text" name="slug" required placeholder="vps-01-prod" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Hostname</label>
+          <input type="text" name="hostname" required placeholder="vps-01" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">FQDN (Fully Qualified Domain Name)</label>
+          <input type="text" name="fqdn" placeholder="vps-01.example.com" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Display Name</label>
+          <input type="text" name="display_name" placeholder="Main Production VPS" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Platform</label>
+          <select name="platform" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm outline-none">
+            <option value="linux">Linux</option>
+            <option value="darwin">macOS</option>
+            <option value="windows">Windows</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Associate Tenants</label>
+          <div class="max-h-36 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-700/50 bg-white dark:bg-gray-900">
+            {{range .Tenants}}
+            <label class="flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer text-sm transition">
+              <div class="flex items-center space-x-2.5">
+                <input type="checkbox" name="tenant_ids" value="{{.ID}}" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                <span class="font-medium text-gray-800 dark:text-gray-200">{{.Name}}</span>
+              </div>
+              <span class="font-mono text-xs text-gray-400">{{.Slug}}</span>
+            </label>
+            {{else}}
+            <div class="px-4 py-2 text-center text-xs text-gray-400">No tenants created yet.</div>
+            {{end}}
+          </div>
+        </div>
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" @click="showCreateModal = false" class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-semibold">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Register Host</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}
