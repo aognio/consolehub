@@ -1,0 +1,18 @@
+{{define "content"}}
+<div class="space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold tracking-tight">Server Settings</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400">Configuration and telemetry retention rules</p>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
+    <h3 class="text-lg font-semibold">Active Configuration</h3>
+    <div class="space-y-2 text-sm font-mono text-gray-600 dark:text-gray-300">
+      <div>Server Address: <span class="text-blue-500">{{.Config.Server.Host}}:{{.Config.Server.Port}}</span></div>
+      <div>Data Directory: <span class="text-blue-500">{{.Config.PocketBase.DataDir}}</span></div>
+      <div>Session Duration: <span class="text-blue-500">{{.Config.Security.SessionDuration}}</span></div>
+      <div>Log Retention: <span class="text-blue-500">{{.Config.Logging.RetentionDays}} days</span></div>
+    </div>
+  </div>
+</div>
+{{end}}
